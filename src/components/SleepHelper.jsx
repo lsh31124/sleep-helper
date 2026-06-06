@@ -264,6 +264,7 @@ const AudioEngine = (() => {
         audio.volume = volume;
         audio.play().catch(e => console.warn("Audio play failed:", e));
         currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true, audioEl: audio };
+        return audio;
       } else {
         const c = getCtx();
         if (!c) return;
@@ -479,7 +480,7 @@ function SoundTile({ sound, isPlaying, volume, onToggle, onVolumeChange }) {
       {isPlaying && (
         <div className="px-4 pb-3">
           <input type="range" min="0" max="100" value={volume*100}
-            onChange={e => onVolumeChange(e.target.value/100)}
+            onChange={e => onVolumeChange(parseFloat(e.target.value)/100)}
             className="w-full" style={{ height: 3, accentColor: sound.color, opacity: 0.7 }} />
         </div>
       )}
@@ -533,16 +534,25 @@ export default function SleepHelper() {
   const toggleSound = (soundId) => {
     if (activeSound === soundId) {
       AudioEngine.stopAll();
+      audioElRef.current = null;
       setActiveSound(null);
     } else {
-      AudioEngine.play(soundId, volume);
+      const el = AudioEngine.play(soundId, volume);
+      audioElRef.current = el || null;
       setActiveSound(soundId);
     }
   };
 
+  const audioElRef = useRef(null);
+
   const changeVolume = (vol) => {
     setVolume(vol);
-    AudioEngine.setVolume(vol);
+    // mp3: 직접 audioEl 조작
+    if (audioElRef.current) {
+      audioElRef.current.volume = vol;
+    } else {
+      AudioEngine.setVolume(vol);
+    }
   };
 
   // Timer — fixed: properly compute seconds from minutes
