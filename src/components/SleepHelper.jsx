@@ -523,9 +523,10 @@ export default function SleepHelper() {
   const [timerRemaining, setTimerRemaining] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
   const timerRef = useRef(null);
-  const timerRemainingRef = useRef(0); // ref mirror to avoid stale closure in interval
+  const timerRemainingRef = useRef(0);
+  const audioElRef = useRef(null); // mp3 재생 중인 HTMLAudioElement
 
-  // Cleanup AudioContext on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => { AudioEngine.stopAll(); };
   }, []);
@@ -533,25 +534,50 @@ export default function SleepHelper() {
   // Single sound toggle
   const toggleSound = (soundId) => {
     if (activeSound === soundId) {
+      // 정지
+      if (audioElRef.current) {
+        audioElRef.current.pause();
+        audioElRef.current.src = "";
+        audioElRef.current = null;
+      }
       AudioEngine.stopAll();
-      audioElRef.current = null;
       setActiveSound(null);
     } else {
-      const el = AudioEngine.play(soundId, volume);
-      audioElRef.current = el || null;
+      // 이전 소리 정지
+      if (audioElRef.current) {
+        audioElRef.current.pause();
+        audioElRef.current.src = "";
+        audioElRef.current = null;
+      }
+      AudioEngine.stopAll();
+
+      const mp3Map = {
+        rain: "/sounds/rain.mp3",
+        ocean: "/sounds/ocean.mp3",
+        crickets: "/sounds/crickets.mp3",
+      };
+
+      if (mp3Map[soundId]) {
+        // mp3 방식 — React ref로 직접 관리
+        const audio = new Audio(mp3Map[soundId]);
+        audio.loop = true;
+        audio.volume = volume;
+        audio.play().catch(e => console.warn("play failed:", e));
+        audioElRef.current = audio;
+      } else {
+        // Web Audio API (노이즈 3종)
+        AudioEngine.play(soundId, volume);
+      }
       setActiveSound(soundId);
     }
   };
 
-  const audioElRef = useRef(null);
-
   const changeVolume = (vol) => {
     setVolume(vol);
-    // mp3: 직접 audioEl 조작
     if (audioElRef.current) {
-      audioElRef.current.volume = vol;
+      audioElRef.current.volume = vol; // mp3 직접 조작
     } else {
-      AudioEngine.setVolume(vol);
+      AudioEngine.setVolume(vol); // Web Audio API
     }
   };
 
