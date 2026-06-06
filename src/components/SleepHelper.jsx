@@ -255,8 +255,6 @@ const AudioEngine = (() => {
     crickets: "/sounds/crickets.mp3",
   };
 
-  let currentAudioEl = null;
-
   const api = {
     play(soundId, volume = 0.5) {
       api.stopAll();
@@ -265,8 +263,7 @@ const AudioEngine = (() => {
         audio.loop = true;
         audio.volume = volume;
         audio.play().catch(e => console.warn("Audio play failed:", e));
-        currentAudioEl = audio;
-        currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true };
+        currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true, audioEl: audio };
       } else {
         const c = getCtx();
         if (!c) return;
@@ -285,10 +282,9 @@ const AudioEngine = (() => {
       }
     },
     stopAll() {
-      if (currentAudioEl) {
-        currentAudioEl.pause();
-        currentAudioEl.src = "";
-        currentAudioEl = null;
+      if (currentSound?.audioEl) {
+        currentSound.audioEl.pause();
+        currentSound.audioEl.src = "";
       }
       if (currentSound && !currentSound.isMP3) {
         try { currentSound.source.stop(); } catch {}
@@ -299,15 +295,15 @@ const AudioEngine = (() => {
       currentSound = null;
     },
     setVolume(vol) {
-      if (currentAudioEl) {
-        currentAudioEl.volume = vol;
+      if (currentSound?.audioEl) {
+        currentSound.audioEl.volume = vol;
       } else if (currentSound?.gain) {
         currentSound.gain.gain.value = vol;
       }
     },
     fadeOut(duration = 3000) {
-      if (currentAudioEl) {
-        const audio = currentAudioEl;
+      if (currentSound?.audioEl) {
+        const audio = currentSound.audioEl;
         const startVol = audio.volume;
         const steps = 30;
         const stepInterval = duration / steps;
@@ -647,7 +643,7 @@ export default function SleepHelper() {
       )}
 
       {/* Content */}
-      <div className="relative z-10 max-w-md mx-auto px-5 pb-28" style={{ paddingTop: "env(safe-area-inset-top, 48px)" }}>
+      <div className="relative z-10 max-w-md mx-auto px-5 pb-28" style={{ paddingTop: "env(safe-area-inset-top, 120px)" }}>
         {/* Header */}
         <div className="pt-6 pb-8 text-center">
           <h1 style={{ fontSize: 24, fontWeight: 200, color: "rgba(200,220,240,0.85)", fontFamily: "'Noto Serif KR', serif", letterSpacing: 3 }}>
