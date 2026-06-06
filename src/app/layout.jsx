@@ -1,4 +1,5 @@
 import "./globals.css";
+import Script from "next/script";
 
 export const metadata = {
   title: "고요한 밤 — 수면 도우미",
@@ -12,7 +13,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ko">
       <head>
-        {/* Google Fonts via <link> — CSP-safe, not @import */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -20,7 +20,16 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Script
+          src="https://cdn.jsdelivr.net/npm/eruda"
+          strategy="afterInteractive"
+          onLoad={() => {
+            if (typeof eruda !== "undefined") eruda.init();
+          }}
+        />
+      </body>
     </html>
   );
 }
