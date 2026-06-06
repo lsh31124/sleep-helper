@@ -18,8 +18,6 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@200;300;400&family=Noto+Serif+KR:wght@200;300;400&display=swap"
           rel="stylesheet"
         />
-        <script src="https://cdn.jsdelivr.net/npm/eruda" />
-        <script dangerouslySetInnerHTML={{ __html: 'window.addEventListener("load", function(){ eruda.init(); })' }} />
       </head>
       <body>{children}</body>
     </html>
