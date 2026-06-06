@@ -243,57 +243,86 @@ const AudioEngine = (() => {
     return { source: src, output: hp, extras: [] };
   }
 
-  const generators = {
+  const noiseGenerators = {
     white: createWhiteNoise,
     pink: createPinkNoise,
     brown: createBrownNoise,
-    rain: createRain,
-    ocean: createOcean,
-    crickets: createCrickets,
   };
+
+  const mp3Sources = {
+    rain: "/sounds/rain.mp3",
+    ocean: "/sounds/ocean.mp3",
+    crickets: "/sounds/crickets.mp3",
+  };
+
+  let currentAudioEl = null;
 
   const api = {
     play(soundId, volume = 0.5) {
       api.stopAll();
-      const c = getCtx();
-      if (!c) return;
-      const gen = generators[soundId];
-      if (!gen) return;
-
-      const { source, output, extras } = gen();
-      const gain = c.createGain();
-      gain.gain.value = volume;
-      output.connect(gain);
-      gain.connect(c.destination);
-
-      if (source._started !== true) {
-        source.start();
-        source._started = true;
+      if (mp3Sources[soundId]) {
+        const audio = new Audio(mp3Sources[soundId]);
+        audio.loop = true;
+        audio.volume = volume;
+        audio.play().catch(e => console.warn("Audio play failed:", e));
+        currentAudioEl = audio;
+        currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true };
+      } else {
+        const c = getCtx();
+        if (!c) return;
+        const gen = noiseGenerators[soundId];
+        if (!gen) return;
+        const { source, output, extras } = gen();
+        const gain = c.createGain();
+        gain.gain.value = volume;
+        output.connect(gain);
+        gain.connect(c.destination);
+        if (source._started !== true) { source.start(); source._started = true; }
+        for (const ex of extras) {
+          if (ex._started !== true) { ex.start(); ex._started = true; }
+        }
+        currentSound = { id: soundId, source, gain, extras, isMP3: false };
       }
-      for (const ex of extras) {
-        if (ex._started !== true) { ex.start(); ex._started = true; }
-      }
-
-      currentSound = { id: soundId, source, gain, extras };
     },
     stopAll() {
-      if (currentSound) {
+      if (currentAudioEl) {
+        currentAudioEl.pause();
+        currentAudioEl.src = "";
+        currentAudioEl = null;
+      }
+      if (currentSound && !currentSound.isMP3) {
         try { currentSound.source.stop(); } catch {}
         for (const ex of currentSound.extras || []) {
           try { ex.stop(); } catch {}
         }
-        currentSound = null;
       }
+      currentSound = null;
     },
     setVolume(vol) {
-      if (currentSound) currentSound.gain.gain.value = vol;
+      if (currentAudioEl) {
+        currentAudioEl.volume = vol;
+      } else if (currentSound?.gain) {
+        currentSound.gain.gain.value = vol;
+      }
     },
     fadeOut(duration = 3000) {
-      if (!currentSound) return;
-      const c = getCtx();
-      if (!c) return;
-      currentSound.gain.gain.setTargetAtTime(0, c.currentTime, duration / 3000);
-      setTimeout(() => api.stopAll(), duration + 500); // fixed: was `this.stopAll()`
+      if (currentAudioEl) {
+        const audio = currentAudioEl;
+        const startVol = audio.volume;
+        const steps = 30;
+        const stepInterval = duration / steps;
+        let step = 0;
+        const fade = setInterval(() => {
+          step++;
+          audio.volume = Math.max(0, startVol * (1 - step / steps));
+          if (step >= steps) { clearInterval(fade); api.stopAll(); }
+        }, stepInterval);
+      } else if (currentSound?.gain) {
+        const c = getCtx();
+        if (!c) return;
+        currentSound.gain.gain.setTargetAtTime(0, c.currentTime, duration / 3000);
+        setTimeout(() => api.stopAll(), duration + 500);
+      }
     },
     getCurrentId() {
       return currentSound ? currentSound.id : null;
