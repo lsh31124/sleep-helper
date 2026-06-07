@@ -273,9 +273,11 @@ const AudioEngine = (() => {
         currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true, audioEl: audio };
         return audio;
       } else {
-        // Web Audio API (노이즈 3종) — async로 AudioContext resume 보장
-        getCtxAsync().then(c => {
-          if (!c) return;
+        // Web Audio API — 이벤트 핸들러 내에서 동기적으로 ctx 생성/resume
+        const c = getCtx();
+        if (!c) return;
+        // iOS: resume()은 Promise지만 ctx 생성은 이미 이벤트 핸들러에서 됐으므로 OK
+        const startNoise = () => {
           const gen = noiseGenerators[soundId];
           if (!gen) return;
           const result = gen();
@@ -290,7 +292,12 @@ const AudioEngine = (() => {
             if (ex._started !== true) { ex.start(); ex._started = true; }
           }
           currentSound = { id: soundId, source, gain, extras, isMP3: false };
-        });
+        };
+        if (c.state === "suspended") {
+          c.resume().then(startNoise);
+        } else {
+          startNoise();
+        }
       }
     },
     stopAll() {
