@@ -601,12 +601,16 @@ export default function SleepHelper() {
 
   // Timer — fixed: properly compute seconds from minutes
   const startTimer = (mins) => {
+    // 먼저 완전히 리셋 후 재시작 (같은 분 재클릭 시 useEffect 재실행 보장)
     if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
     const totalSeconds = mins * 60;
     timerRemainingRef.current = totalSeconds;
+    setTimerActive(false); // 먼저 false로
     setTimerMinutes(mins);
     setTimerRemaining(totalSeconds);
-    setTimerActive(true);
+    // 다음 틱에 true로 설정해서 useEffect 반드시 재실행
+    setTimeout(() => setTimerActive(true), 0);
   };
 
   const stopTimer = () => {
