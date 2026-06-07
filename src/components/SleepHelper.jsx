@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 // ── Improved Audio Engine (Web Audio API) ─────────────────
 const AudioEngine = (() => {
@@ -650,14 +650,17 @@ export default function SleepHelper() {
     };
   }, [timerActive]); // only re-run when timer is started/stopped
 
-  const stars = useMemo(() => Array.from({length:40}, () => ({
-    size: Math.random()*2+1,
-    opacity: Math.random()*0.4+0.1,
-    top: Math.random()*50,
-    left: Math.random()*100,
-    duration: 3+Math.random()*4,
-    delay: Math.random()*5,
-  })), []);
+  const [stars, setStars] = useState([]);
+  useEffect(() => {
+    setStars(Array.from({length:40}, () => ({
+      size: Math.random()*2+1,
+      opacity: Math.random()*0.4+0.1,
+      top: Math.random()*50,
+      left: Math.random()*100,
+      duration: 3+Math.random()*4,
+      delay: Math.random()*5,
+    })));
+  }, []);
 
   const tabs = [
     { id: "sounds", label: "소리", icon: "♪" },
