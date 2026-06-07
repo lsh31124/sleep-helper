@@ -295,7 +295,6 @@ const AudioEngine = (() => {
           if (!gen) return;
           const result = gen();
           if (!result) return;
-          if (activeSoundRef.current !== soundId) return;
           const { source, output, extras } = result;
           const gain = c.createGain();
           gain.gain.value = volume;
