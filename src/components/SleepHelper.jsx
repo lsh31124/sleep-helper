@@ -20,6 +20,20 @@ const AudioEngine = (() => {
     return ctx;
   }
 
+  async function makeBufferAsync(seconds, fn) {
+    // OfflineAudioContext로 비동기 처리 — 메인 스레드 블로킹 방지 (#10)
+    const sampleRate = 44100;
+    const len = Math.floor(seconds * sampleRate);
+    const offline = new OfflineAudioContext(2, len, sampleRate);
+    const buf = offline.createBuffer(2, len, sampleRate);
+    const L = buf.getChannelData(0);
+    const R = buf.getChannelData(1);
+    // fn은 동기지만 호출을 다음 마이크로태스크로 미뤄서 UI 블로킹 최소화
+    await new Promise(resolve => setTimeout(resolve, 0));
+    fn(L, R, sampleRate, len);
+    return buf;
+  }
+  // 하위 호환용 동기 버전 (내부에서만 사용)
   function makeBuffer(seconds, fn) {
     const c = getCtx();
     if (!c) return null;
@@ -273,15 +287,15 @@ const AudioEngine = (() => {
         currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true, audioEl: audio };
         return audio;
       } else {
-        // Web Audio API — 이벤트 핸들러 내에서 동기적으로 ctx 생성/resume
+        // Web Audio API — 비동기 버퍼 생성으로 메인 스레드 블로킹 방지 (#10)
         const c = getCtx();
         if (!c) return;
-        // iOS: resume()은 Promise지만 ctx 생성은 이미 이벤트 핸들러에서 됐으므로 OK
-        const startNoise = () => {
+        const startNoise = async () => {
           const gen = noiseGenerators[soundId];
           if (!gen) return;
           const result = gen();
           if (!result) return;
+          if (activeSoundRef.current !== soundId) return;
           const { source, output, extras } = result;
           const gain = c.createGain();
           gain.gain.value = volume;
