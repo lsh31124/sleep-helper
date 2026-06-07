@@ -353,30 +353,10 @@ const AudioEngine = (() => {
         setTimeout(() => api.stopAll(), duration + 500);
       }
     },
-    playMP3(url, volume, soundId, activeSoundRef, gainNodeRef, bufferSourceRef) {
-      const c = getCtx();
-      if (!c) return;
-      fetch(url)
-        .then(r => r.arrayBuffer())
-        .then(buf => c.decodeAudioData(buf))
-        .then(decoded => {
-          if (activeSoundRef.current !== soundId) return;
-          const src = c.createBufferSource();
-          src.buffer = decoded;
-          src.loop = true;
-          const gain = c.createGain();
-          gain.gain.value = volume;
-          src.connect(gain);
-          gain.connect(c.destination);
-          src.start();
-          gainNodeRef.current = gain;
-          bufferSourceRef.current = src;
-        })
-        .catch(e => console.warn("mp3 load failed:", e));
-    },
     getCurrentId() {
       return currentSound ? currentSound.id : null;
-    }
+    },
+    getCtx,  // 외부 접근용 노출
   };
   return api;
 })();
@@ -626,7 +606,25 @@ export default function SleepHelper() {
 
       if (mp3Map[soundId]) {
         // fetch + decodeAudioData → BufferSource seamless loop
-        AudioEngine.playMP3(mp3Map[soundId], volume, soundId, activeSoundRef, gainNodeRef, bufferSourceRef);
+        const c = AudioEngine.getCtx();
+        if (!c) return;
+        fetch(mp3Map[soundId])
+          .then(r => r.arrayBuffer())
+          .then(buf => c.decodeAudioData(buf))
+          .then(decoded => {
+            if (activeSoundRef.current !== soundId) return;
+            const src = c.createBufferSource();
+            src.buffer = decoded;
+            src.loop = true;
+            const gain = c.createGain();
+            gain.gain.value = volume;
+            src.connect(gain);
+            gain.connect(c.destination);
+            src.start();
+            gainNodeRef.current = gain;
+            bufferSourceRef.current = src;
+          })
+          .catch(e => console.warn("mp3 load failed:", e));
       } else {
         // Web Audio API (노이즈 3종)
         AudioEngine.play(soundId, volume);
