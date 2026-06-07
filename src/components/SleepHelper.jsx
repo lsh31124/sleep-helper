@@ -666,11 +666,26 @@ export default function SleepHelper() {
         timerRef.current = null;
         setTimerActive(false);
         setTimerMinutes(null);
-        AudioEngine.fadeOut(3000);
-        setTimeout(() => {
-          setActiveSound(null);
-          setBreathingActive(false);
-        }, 3500);
+        // mp3(gainNodeRef) 또는 노이즈(AudioEngine) 페이드아웃
+        const FADE = 3000;
+        if (gainNodeRef.current) {
+          const gain = gainNodeRef.current;
+          const c = AudioEngine.getCtx();
+          if (c) gain.gain.setTargetAtTime(0, c.currentTime, FADE / 3000);
+          setTimeout(() => {
+            try { bufferSourceRef.current?.stop(); } catch {}
+            bufferSourceRef.current = null;
+            gainNodeRef.current = null;
+            setActiveSound(null);
+            setBreathingActive(false);
+          }, FADE + 500);
+        } else {
+          AudioEngine.fadeOut(FADE);
+          setTimeout(() => {
+            setActiveSound(null);
+            setBreathingActive(false);
+          }, FADE + 500);
+        }
       }
     }, 1000);
   };
