@@ -353,6 +353,27 @@ const AudioEngine = (() => {
         setTimeout(() => api.stopAll(), duration + 500);
       }
     },
+    playMP3(url, volume, soundId, activeSoundRef, gainNodeRef, bufferSourceRef) {
+      const c = getCtx();
+      if (!c) return;
+      fetch(url)
+        .then(r => r.arrayBuffer())
+        .then(buf => c.decodeAudioData(buf))
+        .then(decoded => {
+          if (activeSoundRef.current !== soundId) return;
+          const src = c.createBufferSource();
+          src.buffer = decoded;
+          src.loop = true;
+          const gain = c.createGain();
+          gain.gain.value = volume;
+          src.connect(gain);
+          gain.connect(c.destination);
+          src.start();
+          gainNodeRef.current = gain;
+          bufferSourceRef.current = src;
+        })
+        .catch(e => console.warn("mp3 load failed:", e));
+    },
     getCurrentId() {
       return currentSound ? currentSound.id : null;
     }
@@ -605,29 +626,7 @@ export default function SleepHelper() {
 
       if (mp3Map[soundId]) {
         // fetch + decodeAudioData → BufferSource seamless loop
-        const c = getCtx();
-        if (!c) return;
-        const url = mp3Map[soundId];
-        fetch(url)
-          .then(r => r.arrayBuffer())
-          .then(buf => c.decodeAudioData(buf))
-          .then(decoded => {
-            // 혹시 그 사이에 다른 소리로 바뀌었으면 무시
-            if (activeSoundRef.current !== soundId) return;
-            const src = c.createBufferSource();
-            src.buffer = decoded;
-            src.loop = true;
-            const gain = c.createGain();
-            gain.gain.value = volume;
-            src.connect(gain);
-            gain.connect(c.destination);
-            src.start();
-            audioElRef.current = null; // mp3 HTMLAudio 안씀
-            // gain을 ref에 저장해서 볼륨 조절 가능하게
-            gainNodeRef.current = gain;
-            bufferSourceRef.current = src;
-          })
-          .catch(e => console.warn("mp3 load failed:", e));
+        AudioEngine.playMP3(mp3Map[soundId], volume, soundId, activeSoundRef, gainNodeRef, bufferSourceRef);
       } else {
         // Web Audio API (노이즈 3종)
         AudioEngine.play(soundId, volume);
