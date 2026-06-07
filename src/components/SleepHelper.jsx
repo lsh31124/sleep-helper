@@ -7,6 +7,12 @@ const AudioEngine = (() => {
   let ctx = null;
   let currentSound = null; // { id, source, gain, nodes[] }
 
+  async function getCtxAsync() {
+    if (typeof window === "undefined") return null;
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") await ctx.resume();
+    return ctx;
+  }
   function getCtx() {
     if (typeof window === "undefined") return null;
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -17,7 +23,7 @@ const AudioEngine = (() => {
   function makeBuffer(seconds, fn) {
     const c = getCtx();
     if (!c) return null;
-    const len = seconds * c.sampleRate;
+    const len = Math.floor(seconds * c.sampleRate);
     const buf = c.createBuffer(2, len, c.sampleRate);
     const L = buf.getChannelData(0);
     const R = buf.getChannelData(1);
@@ -27,6 +33,7 @@ const AudioEngine = (() => {
 
   function createWhiteNoise() {
     const c = getCtx();
+    if (!c) return null;
     const buf = makeBuffer(4, (L, R, sr, len) => {
       for (let i = 0; i < len; i++) {
         L[i] = Math.random() * 2 - 1;
@@ -266,20 +273,24 @@ const AudioEngine = (() => {
         currentSound = { id: soundId, source: null, gain: null, extras: [], isMP3: true, audioEl: audio };
         return audio;
       } else {
-        const c = getCtx();
-        if (!c) return;
-        const gen = noiseGenerators[soundId];
-        if (!gen) return;
-        const { source, output, extras } = gen();
-        const gain = c.createGain();
-        gain.gain.value = volume;
-        output.connect(gain);
-        gain.connect(c.destination);
-        if (source._started !== true) { source.start(); source._started = true; }
-        for (const ex of extras) {
-          if (ex._started !== true) { ex.start(); ex._started = true; }
-        }
-        currentSound = { id: soundId, source, gain, extras, isMP3: false };
+        // Web Audio API (노이즈 3종) — async로 AudioContext resume 보장
+        getCtxAsync().then(c => {
+          if (!c) return;
+          const gen = noiseGenerators[soundId];
+          if (!gen) return;
+          const result = gen();
+          if (!result) return;
+          const { source, output, extras } = result;
+          const gain = c.createGain();
+          gain.gain.value = volume;
+          output.connect(gain);
+          gain.connect(c.destination);
+          if (source._started !== true) { source.start(); source._started = true; }
+          for (const ex of extras) {
+            if (ex._started !== true) { ex.start(); ex._started = true; }
+          }
+          currentSound = { id: soundId, source, gain, extras, isMP3: false };
+        });
       }
     },
     stopAll() {
