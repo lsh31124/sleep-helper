@@ -543,6 +543,9 @@ export default function SleepHelper() {
   const timerRef = useRef(null);
   const timerRemainingRef = useRef(0);
   const audioElRef = useRef(null); // mp3 재생 중인 HTMLAudioElement
+  const bufferSourceRef = useRef(null); // seamless loop BufferSource
+  const gainNodeRef = useRef(null); // BufferSource gain node
+  const activeSoundRef = useRef(null); // 클로저 문제 방지용 ref
 
   // Cleanup on unmount
   useEffect(() => {
@@ -558,7 +561,13 @@ export default function SleepHelper() {
         audioElRef.current.src = "";
         audioElRef.current = null;
       }
+      if (bufferSourceRef.current) {
+        try { bufferSourceRef.current.stop(); } catch {}
+        bufferSourceRef.current = null;
+        gainNodeRef.current = null;
+      }
       AudioEngine.stopAll();
+      activeSoundRef.current = null;
       setActiveSound(null);
     } else {
       // 이전 소리 정지
@@ -566,6 +575,11 @@ export default function SleepHelper() {
         audioElRef.current.pause();
         audioElRef.current.src = "";
         audioElRef.current = null;
+      }
+      if (bufferSourceRef.current) {
+        try { bufferSourceRef.current.stop(); } catch {}
+        bufferSourceRef.current = null;
+        gainNodeRef.current = null;
       }
       AudioEngine.stopAll();
 
@@ -576,26 +590,47 @@ export default function SleepHelper() {
       };
 
       if (mp3Map[soundId]) {
-        // mp3 방식 — React ref로 직접 관리
-        const audio = new Audio(mp3Map[soundId]);
-        audio.loop = true;
-        audio.volume = volume;
-        audio.play().catch(e => console.warn("play failed:", e));
-        audioElRef.current = audio;
+        // fetch + decodeAudioData → BufferSource seamless loop
+        const c = getCtx();
+        if (!c) return;
+        const url = mp3Map[soundId];
+        fetch(url)
+          .then(r => r.arrayBuffer())
+          .then(buf => c.decodeAudioData(buf))
+          .then(decoded => {
+            // 혹시 그 사이에 다른 소리로 바뀌었으면 무시
+            if (activeSoundRef.current !== soundId) return;
+            const src = c.createBufferSource();
+            src.buffer = decoded;
+            src.loop = true;
+            const gain = c.createGain();
+            gain.gain.value = volume;
+            src.connect(gain);
+            gain.connect(c.destination);
+            src.start();
+            audioElRef.current = null; // mp3 HTMLAudio 안씀
+            // gain을 ref에 저장해서 볼륨 조절 가능하게
+            gainNodeRef.current = gain;
+            bufferSourceRef.current = src;
+          })
+          .catch(e => console.warn("mp3 load failed:", e));
       } else {
         // Web Audio API (노이즈 3종)
         AudioEngine.play(soundId, volume);
       }
+      activeSoundRef.current = soundId;
       setActiveSound(soundId);
     }
   };
 
   const changeVolume = (vol) => {
     setVolume(vol);
-    if (audioElRef.current) {
-      audioElRef.current.volume = vol; // mp3 직접 조작
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = vol; // seamless loop gain
+    } else if (audioElRef.current) {
+      audioElRef.current.volume = vol;
     } else {
-      AudioEngine.setVolume(vol); // Web Audio API
+      AudioEngine.setVolume(vol);
     }
   };
 
