@@ -601,16 +601,33 @@ export default function SleepHelper() {
 
   // Timer — fixed: properly compute seconds from minutes
   const startTimer = (mins) => {
-    // 먼저 완전히 리셋 후 재시작 (같은 분 재클릭 시 useEffect 재실행 보장)
+    // 기존 interval 즉시 제거
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
+
     const totalSeconds = mins * 60;
     timerRemainingRef.current = totalSeconds;
-    setTimerActive(false); // 먼저 false로
     setTimerMinutes(mins);
     setTimerRemaining(totalSeconds);
-    // 다음 틱에 true로 설정해서 useEffect 반드시 재실행
-    setTimeout(() => setTimerActive(true), 0);
+    setTimerActive(true);
+
+    // useEffect 없이 직접 interval 시작 — 재클릭 시에도 항상 동작
+    timerRef.current = setInterval(() => {
+      timerRemainingRef.current -= 1;
+      setTimerRemaining(timerRemainingRef.current);
+
+      if (timerRemainingRef.current <= 0) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        setTimerActive(false);
+        setTimerMinutes(null);
+        AudioEngine.fadeOut(3000);
+        setTimeout(() => {
+          setActiveSound(null);
+          setBreathingActive(false);
+        }, 3500);
+      }
+    }, 1000);
   };
 
   const stopTimer = () => {
@@ -619,40 +636,8 @@ export default function SleepHelper() {
     setTimerActive(false);
     setTimerMinutes(null);
     setTimerRemaining(0);
+    timerRemainingRef.current = 0;
   };
-
-  useEffect(() => {
-    if (!timerActive) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = null;
-      return;
-    }
-
-    timerRef.current = setInterval(() => {
-      setTimerRemaining(prev => {
-        if (prev <= 1) {
-          AudioEngine.fadeOut(3000);
-          setTimeout(() => {
-            setActiveSound(null);
-            setBreathingActive(false);
-          }, 3500);
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-          setTimerActive(false);
-          setTimerMinutes(null);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [timerActive]); // only re-run when timer is started/stopped
 
   const [stars, setStars] = useState([]);
   useEffect(() => {
