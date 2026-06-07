@@ -665,6 +665,81 @@ export default function SleepHelper() {
     { id: "timer", label: "타이머", icon: "◷" },
   ];
 
+  // 탭 콘텐츠 렌더
+  const renderContent = () => (
+    <div style={{ minHeight: 360 }}>
+      {tab === "sounds" && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {SOUNDS.map(s => (
+            <SoundTile key={s.id} sound={s}
+              isPlaying={activeSound === s.id}
+              volume={activeSound === s.id ? volume : 0.5}
+              onToggle={() => toggleSound(s.id)}
+              onVolumeChange={changeVolume} />
+          ))}
+        </div>
+      )}
+      {tab === "breathe" && (
+        <div className="flex flex-col items-center gap-8">
+          <div className="flex gap-2 w-full">
+            {BREATHING_METHODS.map(m => (
+              <button key={m.id} onClick={() => { if(breathingActive) setBreathingActive(false); setSelectedMethod(m); }}
+                className="flex-1 py-2.5 rounded-xl text-center transition-all duration-300"
+                style={{
+                  background: selectedMethod.id===m.id ? "rgba(80,120,170,0.15)" : "transparent",
+                  border: `1px solid ${selectedMethod.id===m.id ? "rgba(100,150,200,0.3)" : "rgba(80,100,130,0.12)"}`,
+                  fontSize: 12,
+                  color: selectedMethod.id===m.id ? "rgba(180,210,240,0.85)" : "rgba(130,155,180,0.5)",
+                }}>
+                {m.name.replace(" 호흡법","")}
+              </button>
+            ))}
+          </div>
+          <div className="text-center" style={{ color: "rgba(140,170,200,0.5)", fontSize: 12 }}>
+            {selectedMethod.inhale}초 흡 {selectedMethod.hold>0?`· ${selectedMethod.hold}초 멈춤`:""} · {selectedMethod.exhale}초 호
+            {selectedMethod.holdAfter ? ` · ${selectedMethod.holdAfter}초 멈춤` : ""}
+          </div>
+          <BreathingCircle method={selectedMethod} isActive={breathingActive} onToggle={() => setBreathingActive(!breathingActive)} />
+          <p style={{ color: "rgba(120,150,180,0.35)", fontSize: 11, textAlign: "center", lineHeight: 1.8, maxWidth: 260 }}>
+            {selectedMethod.desc} — 잠들기 전 3~5 사이클 반복하면 심박수가 낮아지고 이완이 촉진됩니다
+          </p>
+        </div>
+      )}
+      {tab === "timer" && (
+        <div className="flex flex-col items-center gap-8">
+          <p style={{ color: "rgba(140,170,200,0.5)", fontSize: 13, textAlign: "center" }}>
+            시간이 지나면 소리가<br/>서서히 꺼집니다
+          </p>
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-3 w-full max-w-sm">
+            {TIMER_OPTIONS.map(mins => (
+              <button key={mins} onClick={() => startTimer(mins)}
+                className="py-4 rounded-2xl text-center transition-all duration-300"
+                style={{
+                  background: timerMinutes===mins && timerActive ? "rgba(80,130,180,0.2)" : "rgba(30,40,55,0.5)",
+                  border: `1px solid ${timerMinutes===mins && timerActive ? "rgba(100,160,220,0.4)" : "rgba(80,100,130,0.12)"}`,
+                  color: timerMinutes===mins && timerActive ? "rgba(180,210,240,0.9)" : "rgba(140,165,190,0.6)",
+                }}>
+                <div style={{ fontSize: 20, fontWeight: 200, fontFamily: "'Noto Serif KR', serif" }}>{mins}</div>
+                <div style={{ fontSize: 10, marginTop: 2, opacity: 0.6 }}>분</div>
+              </button>
+            ))}
+          </div>
+          {timerActive && (
+            <button onClick={stopTimer} className="px-6 py-2.5 rounded-full transition-all"
+              style={{ background: "rgba(180,80,80,0.15)", border: "1px solid rgba(200,100,100,0.25)", color: "rgba(220,140,140,0.8)", fontSize: 13 }}>
+              타이머 취소
+            </button>
+          )}
+          {!timerActive && !activeSound && (
+            <p style={{ color: "rgba(140,170,200,0.3)", fontSize: 11, textAlign: "center" }}>
+              먼저 소리를 재생한 뒤 타이머를 설정해보세요
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -696,105 +771,76 @@ export default function SleepHelper() {
         </div>
       )}
 
-      {/* Content */}
-      <div className="relative z-10 max-w-md mx-auto px-5 pb-28" style={{ paddingTop: "env(safe-area-inset-top, 120px)" }}>
-        {/* Header */}
+      {/* ── 모바일 레이아웃 (md 미만) ── */}
+      <div className="md:hidden relative z-10 max-w-md mx-auto px-5 pb-28" style={{ paddingTop: "env(safe-area-inset-top, 48px)" }}>
         <div className="pt-6 pb-8 text-center">
-          <h1 style={{ fontSize: 24, fontWeight: 200, color: "rgba(200,220,240,0.85)", fontFamily: "'Noto Serif KR', serif", letterSpacing: 3 }}>
-            고요한 밤
-          </h1>
-          <p style={{ fontSize: 12, color: "rgba(130,160,190,0.4)", marginTop: 6, letterSpacing: 2 }}>
-            편안한 잠을 위한 도우미
-          </p>
+          <h1 style={{ fontSize: 24, fontWeight: 200, color: "rgba(200,220,240,0.85)", fontFamily: "'Noto Serif KR', serif", letterSpacing: 3 }}>고요한 밤</h1>
+          <p style={{ fontSize: 12, color: "rgba(130,160,190,0.4)", marginTop: 6, letterSpacing: 2 }}>편안한 잠을 위한 도우미</p>
         </div>
-
-        {/* Timer display (always visible when active) */}
         {timerActive && timerRemaining > 0 && (
           <div className="mb-6 flex justify-center">
-            <div onClick={stopTimer} className="cursor-pointer" title="탭하여 취소">
-              <TimerRing remaining={timerRemaining} total={timerMinutes * 60} />
-            </div>
+            <div onClick={stopTimer} className="cursor-pointer"><TimerRing remaining={timerRemaining} total={timerMinutes*60} /></div>
           </div>
         )}
+        {renderContent()}
+      </div>
 
-        {/* Tab content */}
-        <div style={{ minHeight: 360 }}>
-          {tab === "sounds" && (
-            <div className="grid grid-cols-2 gap-3">
-              {SOUNDS.map(s => (
-                <SoundTile key={s.id} sound={s}
-                  isPlaying={activeSound === s.id}
-                  volume={activeSound === s.id ? volume : 0.5}
-                  onToggle={() => toggleSound(s.id)}
-                  onVolumeChange={changeVolume} />
+      {/* ── 데스크톱 레이아웃 (md 이상) ── */}
+      <div className="hidden md:flex relative z-10 min-h-screen">
+        {/* 사이드바 */}
+        <div className="w-72 flex flex-col justify-between py-12 px-8 border-r" style={{ borderColor: "rgba(80,100,130,0.12)" }}>
+          {/* 로고 */}
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 200, color: "rgba(200,220,240,0.85)", fontFamily: "'Noto Serif KR', serif", letterSpacing: 3, marginBottom: 8 }}>고요한 밤</h1>
+            <p style={{ fontSize: 12, color: "rgba(130,160,190,0.4)", letterSpacing: 2 }}>편안한 잠을 위한 도우미</p>
+
+            {/* 사이드바 탭 */}
+            <div className="flex flex-col gap-2 mt-12">
+              {tabs.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 text-left"
+                  style={{
+                    background: tab===t.id ? "rgba(60,90,130,0.2)" : "transparent",
+                    border: `1px solid ${tab===t.id ? "rgba(100,150,200,0.2)" : "transparent"}`,
+                  }}>
+                  <span style={{ fontSize: 20, color: tab===t.id ? "rgba(160,200,240,0.8)" : "rgba(100,120,140,0.4)" }}>{t.icon}</span>
+                  <span style={{ fontSize: 14, color: tab===t.id ? "rgba(180,210,240,0.85)" : "rgba(120,145,170,0.5)", letterSpacing: 1 }}>{t.label}</span>
+                </button>
               ))}
             </div>
-          )}
+          </div>
 
-          {tab === "breathe" && (
-            <div className="flex flex-col items-center gap-8">
-              <div className="flex gap-2 w-full">
-                {BREATHING_METHODS.map(m => (
-                  <button key={m.id} onClick={() => { if(breathingActive) setBreathingActive(false); setSelectedMethod(m); }}
-                    className="flex-1 py-2.5 rounded-xl text-center transition-all duration-300"
-                    style={{
-                      background: selectedMethod.id===m.id ? "rgba(80,120,170,0.15)" : "transparent",
-                      border: `1px solid ${selectedMethod.id===m.id ? "rgba(100,150,200,0.3)" : "rgba(80,100,130,0.12)"}`,
-                      fontSize: 12,
-                      color: selectedMethod.id===m.id ? "rgba(180,210,240,0.85)" : "rgba(130,155,180,0.5)",
-                    }}>
-                    {m.name.replace(" 호흡법","")}
-                  </button>
-                ))}
-              </div>
-              <div className="text-center" style={{ color: "rgba(140,170,200,0.5)", fontSize: 12 }}>
-                {selectedMethod.inhale}초 흡 {selectedMethod.hold>0?`· ${selectedMethod.hold}초 멈춤`:""} · {selectedMethod.exhale}초 호
-                {selectedMethod.holdAfter ? ` · ${selectedMethod.holdAfter}초 멈춤` : ""}
-              </div>
-              <BreathingCircle method={selectedMethod} isActive={breathingActive} onToggle={() => setBreathingActive(!breathingActive)} />
-              <p style={{ color: "rgba(120,150,180,0.35)", fontSize: 11, textAlign: "center", lineHeight: 1.8, maxWidth: 260 }}>
-                {selectedMethod.desc} — 잠들기 전 3~5 사이클 반복하면 심박수가 낮아지고 이완이 촉진됩니다
-              </p>
+          {/* 타이머 (사이드바 하단) */}
+          {timerActive && timerRemaining > 0 && (
+            <div className="flex flex-col items-center gap-3">
+              <div onClick={stopTimer} className="cursor-pointer"><TimerRing remaining={timerRemaining} total={timerMinutes*60} /></div>
+              <button onClick={stopTimer} style={{ fontSize: 11, color: "rgba(220,140,140,0.6)" }}>취소</button>
+            </div>
+          )}
+          {!timerActive && (
+            <div style={{ color: "rgba(100,120,140,0.3)", fontSize: 11, textAlign: "center", lineHeight: 1.8 }}>
+              타이머 탭에서<br/>수면 타이머를 설정하세요
             </div>
           )}
 
-          {tab === "timer" && (
-            <div className="flex flex-col items-center gap-8">
-              <p style={{ color: "rgba(140,170,200,0.5)", fontSize: 13, textAlign: "center" }}>
-                시간이 지나면 소리가<br/>서서히 꺼집니다
-              </p>
-              <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
-                {TIMER_OPTIONS.map(mins => (
-                  <button key={mins} onClick={() => startTimer(mins)}
-                    className="py-4 rounded-2xl text-center transition-all duration-300"
-                    style={{
-                      background: timerMinutes===mins && timerActive ? "rgba(80,130,180,0.2)" : "rgba(30,40,55,0.5)",
-                      border: `1px solid ${timerMinutes===mins && timerActive ? "rgba(100,160,220,0.4)" : "rgba(80,100,130,0.12)"}`,
-                      color: timerMinutes===mins && timerActive ? "rgba(180,210,240,0.9)" : "rgba(140,165,190,0.6)",
-                    }}>
-                    <div style={{ fontSize: 20, fontWeight: 200, fontFamily: "'Noto Serif KR', serif" }}>{mins}</div>
-                    <div style={{ fontSize: 10, marginTop: 2, opacity: 0.6 }}>분</div>
-                  </button>
-                ))}
-              </div>
-              {timerActive && (
-                <button onClick={stopTimer} className="px-6 py-2.5 rounded-full transition-all"
-                  style={{ background: "rgba(180,80,80,0.15)", border: "1px solid rgba(200,100,100,0.25)", color: "rgba(220,140,140,0.8)", fontSize: 13 }}>
-                  타이머 취소
-                </button>
-              )}
-              {!timerActive && !activeSound && (
-                <p style={{ color: "rgba(140,170,200,0.3)", fontSize: 11, textAlign: "center" }}>
-                  먼저 소리를 재생한 뒤 타이머를 설정해보세요
-                </p>
-              )}
+          {/* 재생 중 표시 */}
+          {activeSound && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+              style={{ background: "rgba(20,30,45,0.6)", border: "1px solid rgba(80,120,160,0.15)" }}>
+              <div className="rounded-full" style={{ width: 6, height: 6, background: "#5B9BD5", animation: "pulse 2s infinite", flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: "rgba(160,190,220,0.7)" }}>{SOUNDS.find(s=>s.id===activeSound)?.label} 재생 중</span>
             </div>
           )}
+        </div>
+
+        {/* 메인 콘텐츠 */}
+        <div className="flex-1 flex flex-col justify-center px-16 py-12 max-w-3xl">
+          {renderContent()}
         </div>
       </div>
 
-      {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-50" style={{
+      {/* 모바일 하단 탭바 */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50" style={{
         background: "linear-gradient(180deg, transparent 0%, rgba(11,17,32,0.95) 30%)",
         paddingBottom: "env(safe-area-inset-bottom, 16px)",
       }}>
@@ -820,7 +866,6 @@ export default function SleepHelper() {
         @keyframes orbit { from{transform:rotate(0deg) translateX(80px)} to{transform:rotate(360deg) translateX(80px)} }
         @keyframes barPulse { from{height:4px} to{height:14px} }
       `}</style>
-      {/* Google Fonts: move to layout.jsx <head> link tag for CSP compliance */}
     </div>
   );
 }
